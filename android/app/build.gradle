@@ -28,7 +28,7 @@ apply from: project(':flutter_config_plus').projectDir.getPath() + "/dotenv.grad
 
 android {
     namespace "com.example.ecoparking_mobile"
-    compileSdkVersion flutter.compileSdkVersion
+    compileSdkVersion 33
     ndkVersion flutter.ndkVersion
 
     compileOptions {
