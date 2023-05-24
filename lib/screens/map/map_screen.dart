@@ -1,11 +1,8 @@
-import 'dart:async';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:flutter_config_plus/flutter_config_plus.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'dart:ui' as ui;
+
+import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -15,15 +12,15 @@ class MapScreen extends StatefulWidget {
 }
 
 class _MapScreenState extends State<MapScreen> {
-  late GoogleMapController mapController;
-  late String _mapStyleAndroid;
-  late String _mapStyleIOS;
+  bool _isLoading = false;
+  MapboxMap? mapboxMap;
 
-  late LatLng _currentPosition;
-  bool _isLoading = true;
+  _onMapCreated(MapboxMap mapboxMap) {
+    mapboxMap.location.updateSettings(LocationComponentSettings(enabled: true));
+    mapboxMap.setCamera(CameraOptions(zoom: 16));
+    this.mapboxMap = mapboxMap;
+  }
 
-  late BitmapDescriptor customIcon;
-  final List<Marker> _marker = [];
   final parkingLocation = [
     const LatLng(20.9716007, 105.8449143),
     const LatLng(21.0048051, 105.8456057),
@@ -37,67 +34,10 @@ class _MapScreenState extends State<MapScreen> {
     const LatLng(20.9947686, 105.8437232),
     const LatLng(20.9926906, 105.8361958),
   ];
-  Uint8List? marketImages;
-  List<String> images = ['assets/images/parking-icon.png'];
-
-  Future<Uint8List> getImages(String path, int width) async {
-    ByteData data = await rootBundle.load(path);
-    ui.Codec codec = await ui.instantiateImageCodec(data.buffer.asUint8List(),
-        targetHeight: width);
-    ui.FrameInfo fi = await codec.getNextFrame();
-    return (await fi.image.toByteData(format: ui.ImageByteFormat.png))!
-        .buffer
-        .asUint8List();
-  }
 
   @override
   void initState() {
-    rootBundle.loadString('assets/map_style.txt').then((string) {
-      _mapStyleAndroid = string;
-    });
-    rootBundle.loadString('assets/map_style.json').then((string) {
-      _mapStyleIOS = string;
-    });
     super.initState();
-    getLocation();
-    loadData();
-  }
-
-  loadData() async {
-    for (int i = 0; i < parkingLocation.length; i++) {
-      final Uint8List markIcons = await getImages(images[0], 100);
-      // makers added according to index
-      _marker.add(Marker(
-        // given marker id
-        markerId: MarkerId(i.toString()),
-        // given marker icon
-        icon: BitmapDescriptor.fromBytes(markIcons),
-        // given position
-        position: parkingLocation[i],
-        infoWindow: InfoWindow(
-          // given title for marker
-          title: 'Parking: ${i + 1}',
-        ),
-      ));
-      setState(() {});
-    }
-  }
-
-  getLocation() async {
-    LocationPermission permission;
-    permission = await Geolocator.requestPermission();
-
-    Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high);
-    double lat = position.latitude;
-    double long = position.longitude;
-
-    LatLng location = LatLng(lat, long);
-
-    setState(() {
-      _currentPosition = location;
-      _isLoading = false;
-    });
   }
 
   @override
@@ -106,25 +46,16 @@ class _MapScreenState extends State<MapScreen> {
         height: MediaQuery.of(context).size.height,
         width: double.infinity,
         child: SafeArea(
-          child: _isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(),
-                )
-              : GoogleMap(
-                  mapType: MapType.normal,
-                  zoomGesturesEnabled: true,
-                  myLocationButtonEnabled: true,
-                  myLocationEnabled: true,
-                  onMapCreated: (GoogleMapController controller) {
-                    mapController = controller;
-                    Platform.isAndroid
-                        ? mapController.setMapStyle(_mapStyleAndroid)
-                        : mapController.setMapStyle(_mapStyleIOS);
-                  },
-                  initialCameraPosition:
-                      CameraPosition(target: _currentPosition, zoom: 16.0),
-                  markers: Set<Marker>.of(_marker),
-                ),
-        ));
+            child: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(),
+                  )
+                : MapWidget(
+                    resourceOptions: ResourceOptions(
+                        accessToken:
+                            '${FlutterConfigPlus.get('MAPBOX_PUBLIC_ACCESS_TOKEN')}'),
+                    styleUri: '${FlutterConfigPlus.get('MAPSTYLE_URL')}',
+                    onMapCreated: _onMapCreated,
+                  )));
   }
 }
